@@ -1,0 +1,31 @@
+## @file
+#  HvLifecycle.inf - drive the shipping hypervisor through ExitBootServices
+#  with no OS, so the VMX lifecycle and AP startup can be tested under QEMU.
+#
+#  Built only when -D HV_BUILD_TESTS=TRUE; see tests/hv/run.sh.
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = HvLifecycle
+  FILE_GUID                      = 3C9D51F4-8A27-4E60-B1D3-7F42A08E6C55
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = HvLifecycleMain
+
+[Sources]
+  HvLifecycle.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiLib
+  MemoryAllocationLib
+  DevicePathLib
+  BaseLib
+
+[Protocols]
+  gEfiLoadedImageProtocolGuid

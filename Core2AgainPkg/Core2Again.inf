@@ -1,0 +1,63 @@
+## @file
+#  Core2Again.inf - UEFI Type-1 VMX hypervisor that emulates missing
+#  SSE4.2 / POPCNT instructions (traps #UD, decodes, resumes).
+#
+#  Built as a DXE_RUNTIME_DRIVER so the loaded image lands in runtime memory
+#  and survives ExitBootServices; the VM-exit handler must remain valid for the
+#  entire OS runtime. It can be rebuilt as UEFI_DRIVER for bench testing that
+#  stops before booting an OS.
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = Core2Again
+  FILE_GUID                      = A7E1F2C4-9B3D-4E6A-8C1F-2D5B6A7C8E90
+  MODULE_TYPE                    = DXE_RUNTIME_DRIVER
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = HypervisorMain
+
+[Sources]
+  Hypervisor.h
+  Main.c
+  Display.c
+  Diagnostics.c
+  GuestMem.c
+  Mp.c
+  ApStartup.c
+  VmxSetup.c
+  VmxExitHandler.c
+  RealMode.c
+  SseDecoder.c
+  SseString.c
+  Sse41.c
+
+[Sources.X64]
+  # Same routines, one per assembler dialect: MASM/ml64 for Visual Studio, GNU
+  # as for GCC/CLANGDWARF.  The build picks by tool family, so a change to one
+  # file must be mirrored in the other.
+  VmxAsm.asm    | MSFT
+  VmxAsm.S      | GCC
+
+[Packages]
+  MdePkg/MdePkg.dec
+  UefiCpuPkg/UefiCpuPkg.dec
+
+[LibraryClasses]
+  UefiDriverEntryPoint
+  UefiBootServicesTableLib
+  BaseLib
+  BaseMemoryLib
+  CpuLib
+  MemoryAllocationLib
+  DebugLib
+  UefiLib
+
+[Protocols]
+  gEfiMpServiceProtocolGuid            ## SOMETIMES_CONSUMES
+  gEfiGraphicsOutputProtocolGuid       ## SOMETIMES_CONSUMES
+  gEfiLoadedImageProtocolGuid          ## CONSUMES
+
+# TRUE (not a hard MP dependency): some firmware never publishes the UEFI MP
+# Services protocol, and Mp.c falls back to BSP-only rather than never loading.
+[Depex]
+  TRUE

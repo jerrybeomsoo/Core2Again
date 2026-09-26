@@ -1,0 +1,30 @@
+## @file
+#  ApTest.inf - UEFI application that starts an AP through the real trampoline.
+#
+#  Built only when -D HV_BUILD_TESTS=TRUE; see tests/ap/run.sh, which builds it
+#  and boots it under QEMU.
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = ApTest
+  FILE_GUID                      = 7E1C4A62-9B33-4D58-8E71-2A6F0C5D3B19
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = ApTestMain
+
+[Sources]
+  ApTest.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiRuntimeServicesTableLib
+  UefiLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  BaseLib
+  CpuLib

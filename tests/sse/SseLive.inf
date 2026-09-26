@@ -1,0 +1,43 @@
+## @file
+#  SseLive.inf - run the emulated instruction set on a processor that really
+#  lacks it, as a guest under the shipping hypervisor.
+#
+#  This is the only test that exercises the #UD trap, the instruction decoder
+#  and the resume path.  It is meaningful ONLY on hardware where CPUID and the
+#  ISA disagree - a Core 2 / Penryn - so it is built with the other test
+#  applications (-D HV_BUILD_TESTS=TRUE) and run by tests/sse/run.sh.
+#
+#  Sse41.c and SseString.c are linked in as the reference implementation: both
+#  sides then share the arithmetic, so any difference is the decode/trap/resume
+#  path and nothing else.  POPCNT and CRC32 additionally have scalar references
+#  written from the definition, which makes those two groups a real oracle.
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = SseLive
+  FILE_GUID                      = 5E7A2C11-63B4-4F09-9D28-A1C4E5806B37
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = SseLiveMain
+
+[Sources]
+  SseLive.c
+  ../../Core2AgainPkg/Sse41.c
+  ../../Core2AgainPkg/SseString.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiLib
+  MemoryAllocationLib
+  DevicePathLib
+  BaseLib
+  BaseMemoryLib
+  IoLib
+
+[Protocols]
+  gEfiLoadedImageProtocolGuid

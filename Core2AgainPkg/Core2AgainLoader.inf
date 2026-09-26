@@ -1,0 +1,31 @@
+## @file
+#  Core2AgainLoader.inf - test chainloader: loads Core2Again.efi then boots Windows.
+##
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = Core2AgainLoader
+  FILE_GUID                      = C1D2E3F4-A5B6-47C8-9D0E-1F2A3B4C5D6E
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = Core2AgainLoaderMain
+
+[Sources]
+  Core2AgainLoader.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiLib
+  DevicePathLib
+  MemoryAllocationLib
+  BaseLib
+
+[Protocols]
+  gEfiLoadedImageProtocolGuid          ## CONSUMES
+  gEfiSimpleFileSystemProtocolGuid     ## CONSUMES
+  gEfiDevicePathProtocolGuid           ## CONSUMES
+  gEfiBlockIoProtocolGuid              ## CONSUMES
