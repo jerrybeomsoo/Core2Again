@@ -86,7 +86,7 @@ volatile UINTN  gHvCpusLaunched = 0;
 volatile UINT32  gHvBspApicId = 0;
 
 /**
-  Driver-load phase: allocate every CPU's regions and virtualize the APs only.
+  Driver-load phase: allocate the BSP's VMX regions. No CPU enters VMX yet.
 
   The BSP is deliberately LEFT un-virtualized here and deferred to
   ExitBootServices (VmxVirtualizeBspNow). A BIOS-hosted UEFI environment may
@@ -95,8 +95,8 @@ volatile UINT32  gHvBspApicId = 0;
   virtualizing the BSP only when the OS loader leaves boot services, firmware
   runs natively and Windows runs virtualized.
 
-  APs idle in the firmware wait loop (no thunks), so virtualizing them now is
-  safe; they take their INIT/SIPI exits later when the OS starts them.
+  APs remain in the firmware wait loop until the Windows ExitBootServices path
+  starts them. Other operating systems leave that firmware path alone.
 **/
 EFI_STATUS
 VmxPrepareAndVirtualizeAps (

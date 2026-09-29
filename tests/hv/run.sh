@@ -14,7 +14,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 
-ACCEL="kvm"; SMP=2; SECONDS_RUN=45; SHOTS=6; APSTART="TRUE"; APDBG="FALSE"; BSPINIT="FALSE"; NOEPT="FALSE"
+ACCEL="kvm"; SMP=2; SECONDS_RUN=45; SHOTS=6; APSTART="TRUE"; APDBG="FALSE"; BSPINIT="FALSE"; NOEPT="FALSE"; NONWIN="FALSE"; BOOTGATE="FALSE"
 while [ $# -gt 0 ]; do
   case "$1" in
     --kvm) ACCEL="kvm"; shift ;;
@@ -23,13 +23,15 @@ while [ $# -gt 0 ]; do
     --ap-debug) APDBG="TRUE"; shift ;;   # stage markers through HvStartAps
     --bsp-init) BSPINIT="TRUE"; shift ;; # BSP INIT must reset, never park
     --no-ept) NOEPT="TRUE"; shift ;;     # exercise the Penryn memory path
+    --non-windows) NONWIN="TRUE"; shift ;; # pass through a generic EFI loader
+    --boot-gate) BOOTGATE="TRUE"; shift ;; # test CPUID after EBS with SSE4.2 masked
     --smp) SMP="$2"; shift 2 ;;
     --seconds) SECONDS_RUN="$2"; shift 2 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
-if [ "$BSPINIT" = TRUE ] && [ "$ACCEL" != kvm ]; then
-  echo "error: --bsp-init requires --kvm" >&2
+if { [ "$BSPINIT" = TRUE ] || [ "$BOOTGATE" = TRUE ]; } && [ "$ACCEL" != kvm ]; then
+  echo "error: --bsp-init and --boot-gate require --kvm" >&2
   exit 1
 fi
 
@@ -37,7 +39,7 @@ OVMF_CODE="${OVMF_CODE:-/usr/share/edk2/ovmf/OVMF_CODE.fd}"
 OVMF_VARS="${OVMF_VARS:-/usr/share/edk2/ovmf/OVMF_VARS.fd}"
 
 echo "=== building (HV_BUILD_TESTS) ==="
-HV_EXTRA_BUILD_ARGS="-D HV_BUILD_TESTS=TRUE -D HV_AP_STARTUP=$APSTART -D HV_AP_DEBUG=$APDBG -D HV_TEST_BSP_INIT=$BSPINIT -D HV_FORCE_NO_EPT=$NOEPT" "$REPO/scripts/build.sh" RELEASE >/dev/null
+HV_EXTRA_BUILD_ARGS="-D HV_BUILD_TESTS=TRUE -D HV_AP_STARTUP=$APSTART -D HV_AP_DEBUG=$APDBG -D HV_TEST_BSP_INIT=$BSPINIT -D HV_FORCE_NO_EPT=$NOEPT -D HV_TEST_NON_WINDOWS=$NONWIN -D HV_TEST_BOOT_GATE=$BOOTGATE" "$REPO/scripts/build.sh" RELEASE >/dev/null
 BIN="$REPO/Build/Core2AgainPkg/RELEASE_GCC/X64"
 for F in "$BIN/HvLifecycle.efi" "$BIN/Core2Again.efi"; do
   [ -f "$F" ] || { echo "error: missing $F" >&2; exit 1; }
@@ -52,6 +54,8 @@ SUFFIX=""
 [ "$APDBG" = TRUE ]    && SUFFIX="$SUFFIX-apdbg"
 [ "$BSPINIT" = TRUE ]  && SUFFIX="$SUFFIX-bspinit"
 [ "$NOEPT" = TRUE ]    && SUFFIX="$SUFFIX-noept"
+[ "$NONWIN" = TRUE ]   && SUFFIX="$SUFFIX-nonwin"
+[ "$BOOTGATE" = TRUE ] && SUFFIX="$SUFFIX-bootgate"
 OUT="$REPO/Build/hvtest-$ACCEL-smp$SMP$SUFFIX"; rm -rf "$OUT"; mkdir -p "$OUT"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/esp/EFI/BOOT"
@@ -60,6 +64,7 @@ cp "$BIN/Core2Again.efi" "$WORK/esp/Core2Again.efi"
 cp "$OVMF_VARS" "$WORK/vars.fd"
 
 if [ "$ACCEL" = "kvm" ]; then CPU="host,+vmx"; else CPU="qemu64"; fi
+if [ "$BOOTGATE" = TRUE ]; then CPU="host,+vmx,-sse4.1,-sse4.2,-popcnt"; fi
 echo "=== accel=$ACCEL cpu=$CPU smp=$SMP ap_startup=$APSTART for ${SECONDS_RUN}s ==="
 
 qemu-system-x86_64 \
@@ -102,4 +107,16 @@ if [ "$BSPINIT" = TRUE ]; then
     exit 1
   fi
   echo "PASS: BSP INIT reset the VM cleanly"
+fi
+if [ "$BOOTGATE" = TRUE ]; then
+  LAST_SHOT="$(find "$OUT" -maxdepth 1 -name 'shot-*.png' | sort | tail -1)"
+  [ -n "$LAST_SHOT" ] || { echo "FAIL: no screenshot for boot gate" >&2; exit 1; }
+  PIXEL="$(magick identify -format '%[pixel:p{350,740}]' "$LAST_SHOT")"
+  EXPECT="srgb(255,0,0)"
+  [ "$NONWIN" = TRUE ] && EXPECT="srgb(0,0,255)"
+  if [ "$PIXEL" != "$EXPECT" ]; then
+    echo "FAIL: boot gate pixel $PIXEL, expected $EXPECT" >&2
+    exit 1
+  fi
+  echo "PASS: boot gate pixel $PIXEL"
 fi

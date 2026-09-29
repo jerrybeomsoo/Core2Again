@@ -15,6 +15,7 @@
 #define CORE2AGAIN_H_
 
 #include <Uefi.h>
+#include <Protocol/DevicePath.h>
 #include <Library/BaseLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/MemoryAllocationLib.h>
@@ -771,6 +772,9 @@ extern volatile UINT32  gHvApFailReason;
 extern UINT64           gHostCr3;
 extern volatile UINT64  gHvRmFailAddr;    // RealMode.c: last instruction attempted
 extern volatile UINT32  gHvRmFailBytes;   //   ...its first four bytes
+
+// BootGate.c - bounded, allocation-free check of the EBS caller's file path.
+BOOLEAN HvIsWindowsBootPath (IN CONST EFI_DEVICE_PATH_PROTOCOL *DevicePath);
 
 //
 // Mp.c

@@ -1,14 +1,14 @@
 # Restart freezes on some legacy BIOS machines
 
-Two Dell laptops with a Core 2 Duo T9300 have booted Windows 11 24H2 through OpenCore 1.0.4 Duet and Core2Again, but stopped on a black screen whenever Windows restarted. Shutdown worked. The exact cause on those laptops still needs a hardware check.
+Two Dell laptops with a Core 2 Duo T9300 booted Windows 11 24H2 through OpenCore 1.0.4 Duet and Core2Again, but stopped on a black screen whenever Windows restarted. Shutdown worked. The reporter confirmed that v0.1.1-rc1 resolved the restart problem.
 
 We found a reboot bug in Core2Again that fits this symptom. When the boot processor received an INIT signal, the driver put it in *wait for SIPI*. That state is for application processors during startup. The boot processor never gets the startup IPI that would release it, so the machine stays frozen. The [ICH8 chipset documentation](https://www.intel.vn/content/dam/www/public/us/en/documents/datasheets/io-controller-hub-8-datasheet.pdf) says a keyboard-controller reset can generate INIT, and [OpenDuet's reset code](https://github.com/acidanthera/OpenCorePkg/blob/1.0.4/Legacy/BootPlatform/AcpiResetDxe/Reset.c) uses that command when it has no ACPI reset register.
 
-The experimental fix asks the chipset for a full reset when INIT reaches the boot processor. INIT sent to an application processor still follows the usual INIT-SIPI path. A two-processor QEMU test deliberately triggers boot-processor INIT: the previous driver freezes, and the patched driver resets the VM. A separate QEMU Windows restart succeeded even with the previous driver, so that test cannot confirm the Dell fix.
+The fix asks the chipset for a full reset when INIT reaches the boot processor. INIT sent to an application processor still follows the usual INIT-SIPI path. A two-processor QEMU test deliberately triggers boot-processor INIT: the previous driver freezes, and the patched driver resets the VM. A separate QEMU Windows restart succeeded even with the previous driver; the reporter's hardware test supplied the missing confirmation.
 
-## Try the patched driver
+## Trying a new driver build
 
-Keep a copy of the working EFI file. Replace the Core2Again driver loaded by your OpenCore setup with `Core2Again-RELEASE.efi` from the experimental release, using the filename your configuration expects. You do not need to replace OpenCore or reinstall Windows. Then boot Windows and use **Restart** from the Start menu. If it works, try one more restart after signing in.
+Keep a copy of the working EFI file. Replace the Core2Again driver loaded by your OpenCore setup with `Core2Again-RELEASE.efi` from the new release, using the filename your configuration expects. You do not need to replace OpenCore or reinstall Windows. Then boot Windows and use **Restart** from the Start menu. If it works, try one more restart after signing in.
 
 If the machine still stops, please report:
 

@@ -6,8 +6,9 @@ The driver runs underneath Windows through Intel VMX. It presents a slightly new
 
 1. `Core2AgainLoader.efi` starts the driver. `Main.c` probes VMX, prepares shared state and per-processor regions, and hooks `ExitBootServices`.
 2. The loader starts Windows Boot Manager. Firmware and the loader still run on the physical CPU. This lets a BIOS-hosted UEFI environment continue using real-mode BIOS thunks.
-3. At Windows' successful `ExitBootServices` call, the boot processor enters VMX non-root operation. The driver calls the original firmware service, then starts the other processors.
-4. Windows continues as the VMX guest. The exit handler manages `CPUID`, interrupts, control registers, MSRs, exceptions, and processor startup.
+3. At `ExitBootServices`, the driver checks the calling EFI image's path. It enters VMX only for recognized Windows boot loaders. For any other loader, it calls the original firmware service without entering VMX or starting the other processors.
+4. On a Windows boot, the boot processor enters VMX non-root operation. The driver calls the original firmware service, then starts the other processors.
+5. Windows continues as the VMX guest. The exit handler manages `CPUID`, interrupts, control registers, MSRs, exceptions, and processor startup.
 
 The ordering around `ExitBootServices` is deliberate. The boot processor must be under VMX before Windows starts. The other processors must wait until firmware has completed its shutdown; waking them earlier can strand firmware in its own MP teardown. A failed `ExitBootServices` call leaves the hook installed, so the loader's retry still passes through Core2Again.
 
@@ -29,7 +30,7 @@ The host code is built without SSE4.1, SSE4.2, or POPCNT instructions. A fault i
 
 | File | Job |
 | --- | --- |
-| `Main.c` | Driver entry and `ExitBootServices` hook |
+| `Main.c`, `BootGate.c` | Driver entry, Windows boot loader check, and `ExitBootServices` hook |
 | `VmxSetup.c`, `VmxAsm.S`/`.asm` | VMCS, host and guest state, VM entry and exit stubs |
 | `VmxExitHandler.c` | VM-exit routing and guest exception handling |
 | `Mp.c`, `ApStartup.c`, `RealMode.c` | Per-CPU setup and Windows AP bring-up |

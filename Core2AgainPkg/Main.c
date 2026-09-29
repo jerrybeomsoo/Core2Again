@@ -25,10 +25,40 @@
 //
 STATIC EFI_EXIT_BOOT_SERVICES  mOrigExitBs = NULL;
 
+/**
+  Find the EFI image that is leaving boot services without changing MapKey.
+
+  EDK II's HandleProtocol can allocate an open-protocol record here.  The OS
+  loader has already obtained MapKey, so use OpenProtocol with a NULL agent:
+  EDK II returns the interface without an allocation or an open-list change.
+  An unknown caller stays native, including macOS and Linux loaders.
+**/
+STATIC
+BOOLEAN
+IsWindowsExitCaller (
+  IN EFI_HANDLE  ImageHandle
+  )
+{
+  EFI_LOADED_IMAGE_PROTOCOL  *LoadedImage;
+  EFI_STATUS                 Status;
+
+  LoadedImage = NULL;
+  Status = gBS->OpenProtocol (ImageHandle, &gEfiLoadedImageProtocolGuid,
+                             (VOID **)&LoadedImage, NULL, NULL,
+                             EFI_OPEN_PROTOCOL_GET_PROTOCOL);
+  if (EFI_ERROR (Status) || (LoadedImage == NULL)) {
+    return FALSE;
+  }
+  return HvIsWindowsBootPath (LoadedImage->FilePath);
+}
+
 //
 // Each stage runs once, however many times the loader calls ExitBootServices.
 //
 STATIC BOOLEAN  mBspVirtualized = FALSE;
+STATIC EFI_HANDLE  mLastExitHandle = NULL;
+STATIC BOOLEAN     mLastExitKnown = FALSE;
+STATIC BOOLEAN     mLastExitWindows = FALSE;
 #ifndef HV_NO_AP_STARTUP
 STATIC BOOLEAN  mApsStarted     = FALSE;
 #endif
@@ -65,6 +95,24 @@ HvExitBootServicesHook (
   )
 {
   EFI_STATUS  Status;
+
+  //
+  // A globally loaded OpenCore driver sees every OS's ExitBootServices call.
+  // Leave other loaders native.  Do this before VMXON and without allocating,
+  // printing, or changing the caller's memory-map key.
+  //
+  if (!mBspVirtualized) {
+    // A rejected MapKey makes the loader call us again.  Cache the answer so
+    // its retry uses no boot service other than ExitBootServices itself.
+    if (!mLastExitKnown || (mLastExitHandle != ImageHandle)) {
+      mLastExitWindows = IsWindowsExitCaller (ImageHandle);
+      mLastExitHandle = ImageHandle;
+      mLastExitKnown = TRUE;
+    }
+    if (!mLastExitWindows) {
+      return mOrigExitBs (ImageHandle, MapKey);
+    }
+  }
 
   HvMark (5, 'L');
 

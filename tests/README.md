@@ -9,6 +9,9 @@ Run these from the repository root. [The testing guide](../docs/testing.md) expl
 | `./tests/hv/run.sh --kvm --smp 2` | Driver load, VMX lifecycle, and both vCPUs |
 | `./tests/hv/run.sh --kvm --smp 2 --bsp-init` | A boot-processor INIT must reset the VM; the pre-fix driver stays frozen |
 | `./tests/hv/run.sh --kvm --smp 2 --bsp-init --no-ept` | Same reset path without EPT, as on a Penryn processor |
+| `./tests/bootgate/run.sh` | Windows EFI loader paths accepted; Linux, macOS, generic and malformed paths rejected |
+| `./tests/hv/run.sh --kvm --smp 2 --boot-gate` | A Windows-like EFI loader enters VMX under KVM |
+| `./tests/hv/run.sh --kvm --smp 2 --boot-gate --non-windows` | A generic EFI loader leaves boot services without entering VMX |
 | `./tests/legacy/run.sh --image /path/to/windows.qcow2 --smp 2` | SeaBIOS, OpenDuet image, Windows boot, and per-vCPU progress |
 | `./tests/win/run.sh --kvm --image /path/to/windows.qcow2` | UEFI/QEMU Windows boot path |
 | `./tests/penryn/run.sh --host user@older-cpu --key /path/to/key` | Real `#UD` decode and emulation on an older CPU |

@@ -34,6 +34,9 @@
 #include <Library/DevicePathLib.h>
 #include <Protocol/LoadedImage.h>
 #include <Protocol/GraphicsOutput.h>
+#ifndef HV_TEST_NON_WINDOWS
+#include "../common/FakeWindowsPath.h"
+#endif
 
 //
 // The framebuffer, resolved BEFORE ExitBootServices and used after it.  This is
@@ -132,6 +135,10 @@ HvLifecycleMain (
 
   Print (L"[LIFE] calling ExitBootServices - the hook virtualizes here\r\n");
 
+#ifndef HV_TEST_NON_WINDOWS
+  TestUseWindowsBootPath (Li);
+#endif
+
   //
   // The map key must be current at the moment of the call.  The hook
   // virtualizes the BSP before chaining to firmware ExitBootServices and wakes
@@ -175,6 +182,16 @@ HvLifecycleMain (
   // firmware's are gone and we installed none.
   //
   DisableInterrupts ();
+
+#ifdef HV_TEST_BOOT_GATE
+  // QEMU masks SSE4.2 in this mode. Red means Core2Again restored its CPUID
+  // bit for a Windows loader; blue means a different loader stayed native.
+  AsmCpuid (1, &Eax, &Ebx, &Ecx, &Edx);
+  PaintBlock (((Ecx >> 20) & 1) ? 0x00FF0000 : 0x000000FF);
+  for (;;) {
+    CpuPause ();
+  }
+#endif
 
 #ifdef HV_TEST_BSP_INIT
   //

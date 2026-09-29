@@ -55,6 +55,7 @@
 #include <Library/DevicePathLib.h>
 #include <Library/IoLib.h>
 #include <Protocol/LoadedImage.h>
+#include "../common/FakeWindowsPath.h"
 #include <Protocol/GraphicsOutput.h>
 
 //
@@ -826,6 +827,7 @@ SseLiveMain (
   }
 
   Print (L"[SSE] ExitBootServices - the hypervisor takes over here\r\n");
+  TestUseWindowsBootPath (Li);
 
   Map     = NULL;
   MapSize = 0;

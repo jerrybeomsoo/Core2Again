@@ -19,6 +19,7 @@
 [Sources]
   Hypervisor.h
   Main.c
+  BootGate.c
   Display.c
   Diagnostics.c
   GuestMem.c

@@ -47,6 +47,11 @@
   # This is a reboot-path regression test; never enable it in a boot image.
   DEFINE HV_TEST_BSP_INIT        = FALSE
 
+  # The lifecycle test normally presents bootmgfw.efi as its EBS image path.
+  # Set TRUE to test that an unrelated EFI loader stays outside VMX.
+  DEFINE HV_TEST_NON_WINDOWS     = FALSE
+  DEFINE HV_TEST_BOOT_GATE       = FALSE
+
   #
   # Set TRUE to build as if the processor had no EPT.  The target has none, so
   # the pass-through path is what it always runs - and a development host always
@@ -125,9 +130,23 @@
   DEFINE HV_D_BSPINIT = -DHV_NO_TEST_BSP_INIT
   DEFINE HV_M_BSPINIT = /DHV_NO_TEST_BSP_INIT
 !endif
+!if $(HV_TEST_NON_WINDOWS) == TRUE
+  DEFINE HV_D_NONWIN = -DHV_TEST_NON_WINDOWS
+  DEFINE HV_M_NONWIN = /DHV_TEST_NON_WINDOWS
+!else
+  DEFINE HV_D_NONWIN = -DHV_TEST_WINDOWS_PATH
+  DEFINE HV_M_NONWIN = /DHV_TEST_WINDOWS_PATH
+!endif
+!if $(HV_TEST_BOOT_GATE) == TRUE
+  DEFINE HV_D_GATE = -DHV_TEST_BOOT_GATE
+  DEFINE HV_M_GATE = /DHV_TEST_BOOT_GATE
+!else
+  DEFINE HV_D_GATE = -DHV_TEST_BOOT_GATE_OFF
+  DEFINE HV_M_GATE = /DHV_TEST_BOOT_GATE_OFF
+!endif
 
-  MSFT:*_*_X64_CC_FLAGS  = /arch:SSE2 $(HV_M_AP) $(HV_M_APDBG) $(HV_M_NOEPT) $(HV_M_BSPINIT)
-  GCC:*_*_X64_CC_FLAGS   = -march=x86-64 -mno-sse4 -mno-popcnt $(HV_D_AP) $(HV_D_APDBG) $(HV_D_NOEPT) $(HV_D_BSPINIT)
+  MSFT:*_*_X64_CC_FLAGS  = /arch:SSE2 $(HV_M_AP) $(HV_M_APDBG) $(HV_M_NOEPT) $(HV_M_BSPINIT) $(HV_M_NONWIN) $(HV_M_GATE)
+  GCC:*_*_X64_CC_FLAGS   = -march=x86-64 -mno-sse4 -mno-popcnt $(HV_D_AP) $(HV_D_APDBG) $(HV_D_NOEPT) $(HV_D_BSPINIT) $(HV_D_NONWIN) $(HV_D_GATE)
 
   MSFT:DEBUG_*_X64_CC_FLAGS   = /DHV_DIAG_ENABLED=1
   GCC:DEBUG_*_X64_CC_FLAGS    = -DHV_DIAG_ENABLED=1
