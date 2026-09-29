@@ -22,6 +22,7 @@
 **/
 
 #include "Hypervisor.h"
+#include <Library/IoLib.h>
 
 /**
   This processor's state block, from any address on its host stack.
@@ -288,10 +289,30 @@ HandleWrmsr (
 STATIC
 VOID
 HandleInitSignal (
-  VOID
+  IN HV_PCPU  *Pcpu
   )
 {
   gHvDiag.LastEvent = 2;
+
+  //
+  // An INIT delivered to an AP is part of the OS's INIT-SIPI startup sequence.
+  // An INIT delivered to the BSP is different: on legacy Intel chipsets the
+  // keyboard-controller reset command can assert INIT# instead of resetting
+  // the platform.  VMX turns that signal into an exit, so parking the BSP in
+  // wait-for-SIPI leaves the entire machine frozen during a restart.
+  //
+  // ICH8's CF9 reset control register distinguishes a CPU-only INIT (SYS_RST=0)
+  // from a hard platform reset (SYS_RST=1).  Write SYS_RST with RST_CPU clear,
+  // then raise RST_CPU to reset the chipset and both processors.  If a platform
+  // ignores CF9, checkpoint 31 remains on screen in a DEBUG build.
+  //
+  if (Pcpu->IsBsp) {
+    HvMark (31, 'R');
+    IoWrite8 (0xCF9, 0x02);
+    IoWrite8 (0xCF9, 0x06);
+    CpuDeadLoop ();
+  }
+
   AsmVmWrite (VMCS_GUEST_INTERRUPTIBILITY, 0);
   AsmVmWrite (VMCS_GUEST_ACTIVITY_STATE, 3);   // 3 = wait-for-SIPI
 }
@@ -1130,7 +1151,7 @@ HandleVmExit (
 #if HV_DIAG_ENABLED
       Pcpu->Count.Init++;
 #endif
-      HandleInitSignal ();
+      HandleInitSignal (Pcpu);
       return;
 
     case EXIT_REASON_SIPI:

@@ -20,6 +20,7 @@ White numbers are checkpoints. Cyan numbers are rows of data, counted from the t
 | 25 | The special `apdebug` build parks the AP when Windows sends a SIPI |
 | 26 to 29 | `apdebug` AP startup report and timed stages before the live heartbeat |
 | 30 | Live heartbeat; use the row table below |
+| 31 | Boot processor received INIT; Core2Again requested a chipset reset. If this stays on screen, the reset did not complete. |
 
 Numbers 0 to 17 mark progress and continue. Checkpoint 18 records a failed VMX bring-up and returns to its caller. The failure paths at 19, 20, 22, 23, and 24 halt the affected CPU; 25 deliberately parks the AP. In the `apdebug` build, 26 is held for eight seconds and 27 to 29 for two seconds each before continuing. Record the white number and all visible cyan rows before changing anything.
 

@@ -11,10 +11,11 @@ This is source code for an experimental boot path, not an installer or a Windows
 | Configuration | Result |
 | --- | --- |
 | T9900, older Clover-based diagnostic build | Windows 11 reached the desktop. Task Manager showed two processors. |
+| T9300, Dell Inspiron 1520 and Latitude D830, user report | Windows 11 24H2 Enterprise reached the desktop through OpenCore 1.0.4 Duet. Shutdown worked; restart froze. A candidate fix awaits a hardware test. |
 | Current `Core2Again-RELEASE.efi` and OpenDuet USB image | Built and booted to a two-vCPU Windows desktop under SeaBIOS/KVM. They have **not yet been booted on the T9900**. |
 | Conroe/Kentsfield SSE4.1 path | Implemented and compared against real instructions locally. Hardware boot remains untested. |
 
-The first result is real hardware evidence for the VMX and instruction emulation approach. It does not certify the new release binary or USB boot chain on that machine. The current build also has the latest error handling changes, which need their own hardware run.
+The T9900 result is our hardware test; the Dell results are user reports. Neither confirms the new release binary or USB boot chain on the T9900. The restart change still needs a run on the Dell laptops.
 
 ## Get started
 
@@ -32,6 +33,8 @@ The [latest release](https://github.com/jerrybeomsoo/Core2Again/releases) contai
 4. Select the stick in the BIOS boot menu. Core2Again loads the Windows boot manager from an attached drive. The Windows drive is not rewritten by this boot image.
 
 Keep the USB stick inserted when rebooting. For the other image, firmware paths, and troubleshooting, see [Legacy BIOS boot](docs/legacy-boot.md). On a UEFI machine, the driver and loader can be used without the USB image; see the same guide.
+
+Some Dell T9300 users have reported a freeze on Windows restart. A candidate fix and the information needed to check it on hardware are in [Restart troubleshooting](docs/reboot.md).
 
 ## What happens at boot
 

@@ -176,6 +176,31 @@ HvLifecycleMain (
   //
   DisableInterrupts ();
 
+#ifdef HV_TEST_BSP_INIT
+  //
+  // Reboot regression: a physical INIT aimed at the boot processor becomes a
+  // VM exit.  A guest BSP must never be left waiting for a SIPI, because only
+  // application processors participate in the INIT-SIPI startup sequence.
+  // Paint red so a frozen screenshot identifies the old behavior.
+  //
+  {
+    UINT64           ApicBase;
+    volatile UINT32  *Icr;
+    UINT32           ApicId;
+
+    ApicBase = AsmReadMsr64 (0x1B);
+    Icr = (volatile UINT32 *)(UINTN)((ApicBase & 0x000FFFFFFFFFF000ULL) + 0x300);
+    AsmCpuid (1, &Eax, &Ebx, &Ecx, &Edx);
+    ApicId = Ebx >> 24;
+    PaintBlock (0x00FF0000);
+    while ((Icr[0] & 0x1000) != 0) {
+      CpuPause ();
+    }
+    Icr[4] = ApicId << 24;
+    Icr[0] = 0x00004500;  // INIT, level assert, physical BSP destination
+  }
+#endif
+
   //
   // Deliberately NO serial output from here on.  An earlier version wrote to
   // COM1 directly, on the reasoning that the UART is just I/O ports and survives

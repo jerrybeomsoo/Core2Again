@@ -43,6 +43,10 @@
   #
   DEFINE HV_BUILD_TESTS          = FALSE
 
+  # Send an INIT IPI to the BSP after ExitBootServices in the VMX harness.
+  # This is a reboot-path regression test; never enable it in a boot image.
+  DEFINE HV_TEST_BSP_INIT        = FALSE
+
   #
   # Set TRUE to build as if the processor had no EPT.  The target has none, so
   # the pass-through path is what it always runs - and a development host always
@@ -114,9 +118,16 @@
   DEFINE HV_D_NOEPT  = -DHV_EPT_AS_FOUND
   DEFINE HV_M_NOEPT  = /DHV_EPT_AS_FOUND
 !endif
+!if $(HV_TEST_BSP_INIT) == TRUE
+  DEFINE HV_D_BSPINIT = -DHV_TEST_BSP_INIT
+  DEFINE HV_M_BSPINIT = /DHV_TEST_BSP_INIT
+!else
+  DEFINE HV_D_BSPINIT = -DHV_NO_TEST_BSP_INIT
+  DEFINE HV_M_BSPINIT = /DHV_NO_TEST_BSP_INIT
+!endif
 
-  MSFT:*_*_X64_CC_FLAGS  = /arch:SSE2 $(HV_M_AP) $(HV_M_APDBG) $(HV_M_NOEPT)
-  GCC:*_*_X64_CC_FLAGS   = -march=x86-64 -mno-sse4 -mno-popcnt $(HV_D_AP) $(HV_D_APDBG) $(HV_D_NOEPT)
+  MSFT:*_*_X64_CC_FLAGS  = /arch:SSE2 $(HV_M_AP) $(HV_M_APDBG) $(HV_M_NOEPT) $(HV_M_BSPINIT)
+  GCC:*_*_X64_CC_FLAGS   = -march=x86-64 -mno-sse4 -mno-popcnt $(HV_D_AP) $(HV_D_APDBG) $(HV_D_NOEPT) $(HV_D_BSPINIT)
 
   MSFT:DEBUG_*_X64_CC_FLAGS   = /DHV_DIAG_ENABLED=1
   GCC:DEBUG_*_X64_CC_FLAGS    = -DHV_DIAG_ENABLED=1

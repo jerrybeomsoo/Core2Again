@@ -14,24 +14,30 @@ set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 
-ACCEL="kvm"; SMP=2; SECONDS_RUN=45; SHOTS=6; APSTART="TRUE"; APDBG="FALSE"
+ACCEL="kvm"; SMP=2; SECONDS_RUN=45; SHOTS=6; APSTART="TRUE"; APDBG="FALSE"; BSPINIT="FALSE"; NOEPT="FALSE"
 while [ $# -gt 0 ]; do
   case "$1" in
     --kvm) ACCEL="kvm"; shift ;;
     --tcg) ACCEL="tcg"; shift ;;
     --no-ap) APSTART="FALSE"; shift ;;   # single-core build, for A/B
     --ap-debug) APDBG="TRUE"; shift ;;   # stage markers through HvStartAps
+    --bsp-init) BSPINIT="TRUE"; shift ;; # BSP INIT must reset, never park
+    --no-ept) NOEPT="TRUE"; shift ;;     # exercise the Penryn memory path
     --smp) SMP="$2"; shift 2 ;;
     --seconds) SECONDS_RUN="$2"; shift 2 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
+if [ "$BSPINIT" = TRUE ] && [ "$ACCEL" != kvm ]; then
+  echo "error: --bsp-init requires --kvm" >&2
+  exit 1
+fi
 
 OVMF_CODE="${OVMF_CODE:-/usr/share/edk2/ovmf/OVMF_CODE.fd}"
 OVMF_VARS="${OVMF_VARS:-/usr/share/edk2/ovmf/OVMF_VARS.fd}"
 
 echo "=== building (HV_BUILD_TESTS) ==="
-HV_EXTRA_BUILD_ARGS="-D HV_BUILD_TESTS=TRUE -D HV_AP_STARTUP=$APSTART -D HV_AP_DEBUG=$APDBG" "$REPO/scripts/build.sh" RELEASE >/dev/null
+HV_EXTRA_BUILD_ARGS="-D HV_BUILD_TESTS=TRUE -D HV_AP_STARTUP=$APSTART -D HV_AP_DEBUG=$APDBG -D HV_TEST_BSP_INIT=$BSPINIT -D HV_FORCE_NO_EPT=$NOEPT" "$REPO/scripts/build.sh" RELEASE >/dev/null
 BIN="$REPO/Build/Core2AgainPkg/RELEASE_GCC/X64"
 for F in "$BIN/HvLifecycle.efi" "$BIN/Core2Again.efi"; do
   [ -f "$F" ] || { echo "error: missing $F" >&2; exit 1; }
@@ -44,6 +50,8 @@ done
 SUFFIX=""
 [ "$APSTART" = FALSE ] && SUFFIX="$SUFFIX-noap"
 [ "$APDBG" = TRUE ]    && SUFFIX="$SUFFIX-apdbg"
+[ "$BSPINIT" = TRUE ]  && SUFFIX="$SUFFIX-bspinit"
+[ "$NOEPT" = TRUE ]    && SUFFIX="$SUFFIX-noept"
 OUT="$REPO/Build/hvtest-$ACCEL-smp$SMP$SUFFIX"; rm -rf "$OUT"; mkdir -p "$OUT"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/esp/EFI/BOOT"
@@ -67,16 +75,31 @@ mon () { timeout 15 python3 "$REPO/tests/win/mon.py" "$WORK/mon" "$1" 2>/dev/nul
 for _ in $(seq 1 30); do [ -S "$WORK/mon" ] && break; sleep 1; done
 
 INTERVAL=$(( SECONDS_RUN / SHOTS )); [ "$INTERVAL" -lt 1 ] && INTERVAL=1
+EXITED="FALSE"; EXIT_STATUS=0
 for I in $(seq 1 "$SHOTS"); do
   sleep "$INTERVAL"
-  kill -0 "$QPID" 2>/dev/null || { echo "!! qemu exited after $((I*INTERVAL))s"; break; }
+  if ! kill -0 "$QPID" 2>/dev/null; then
+    echo "!! qemu exited after $((I*INTERVAL))s"
+    EXITED="TRUE"
+    if wait "$QPID"; then EXIT_STATUS=0; else EXIT_STATUS=$?; fi
+    break
+  fi
   N=$(printf '%02d' "$I")
   mon "screendump $OUT/shot-$N.ppm" >/dev/null
   [ -f "$OUT/shot-$N.ppm" ] && magick "$OUT/shot-$N.ppm" "$OUT/shot-$N.png" 2>/dev/null && rm -f "$OUT/shot-$N.ppm"
 done
-mon "quit" >/dev/null; sleep 2; kill -9 "$QPID" 2>/dev/null || true; wait "$QPID" 2>/dev/null || true
+if [ "$EXITED" = FALSE ]; then
+  mon "quit" >/dev/null; sleep 2; kill -9 "$QPID" 2>/dev/null || true; wait "$QPID" 2>/dev/null || true
+fi
 
 echo "=== serial ==="
 tr -d '\000' < "$OUT/serial.log" 2>/dev/null | grep -aE 'LIFE|CORE2AGAIN' | head -20 || echo "(none)"
 echo "=== guest errors ==="; [ -s "$OUT/qemu.log" ] && tail -8 "$OUT/qemu.log" || echo "(none)"
-echo "=== screens in $OUT ==="; ls "$OUT"/shot-*.png 2>/dev/null | wc -l
+echo "=== screens in $OUT ==="; find "$OUT" -maxdepth 1 -name 'shot-*.png' | wc -l
+if [ "$BSPINIT" = TRUE ]; then
+  if [ "$EXITED" != TRUE ] || [ "$EXIT_STATUS" -ne 0 ]; then
+    echo "FAIL: BSP INIT did not reset the VM cleanly" >&2
+    exit 1
+  fi
+  echo "PASS: BSP INIT reset the VM cleanly"
+fi
